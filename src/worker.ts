@@ -9,7 +9,7 @@ export interface Env {
 
 const headers = { "content-type": "application/json; charset=utf-8", "x-content-type-options": "nosniff", "cache-control": "no-store" };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers });
-const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" };
+const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type, authorization" };
 const corsJson = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, ...cors } });
 const adminOk = (request: Request, env: Env) => !!env.ADMIN_TOKEN && request.headers.get("authorization") === `Bearer ${env.ADMIN_TOKEN}`;
 const adminJson = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, ...cors } });
