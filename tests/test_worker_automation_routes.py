@@ -48,5 +48,5 @@ print("PASS: CRM search, source filter, and lead activity endpoint markers exist
 # CRM PATCH browser compatibility and editable-field clearing regressions.
 assert '"access-control-allow-methods": "GET,POST,PATCH,OPTIONS"' in worker, "PATCH must be allowed by CORS"
 assert 'Object.prototype.hasOwnProperty.call(b,key)' in worker, "PATCH must distinguish omitted fields from fields explicitly cleared"
-assert "CRM lead priority intelligence" in (root / "src/app/crm/CrmClient.tsx").read_text(encoding="utf-8"), "Lead intelligence UI missing"
+assert "crm-intelligence" in (root / "src/app/crm/CrmClient.tsx").read_text(encoding="utf-8"), "Lead intelligence UI missing"
 print("PASS: CRM PATCH CORS, field clearing, and lead intelligence assertions")
