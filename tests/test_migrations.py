@@ -2,10 +2,10 @@ import pathlib, sqlite3, json
 root = pathlib.Path(__file__).resolve().parents[1]
 db = sqlite3.connect(":memory:")
 db.execute("PRAGMA foreign_keys=ON")
-for path in [root/"db/schema.sql", root/"db/migrations/0002_enterprise_public_and_marketplace.sql", root/"db/migrations/0003_seed_marketplace_categories.sql"]:
+for path in [root/"db/schema.sql", root/"db/migrations/0002_enterprise_public_and_marketplace.sql", root/"db/migrations/0003_seed_marketplace_categories.sql", root/"db/migrations/0004_automation_core.sql"]:
     db.executescript(path.read_text(encoding="utf-8"))
 tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-required = {"departments","department_memberships","work_assignments","marketplace_categories","marketplace_seller_applications","marketplace_vendor_applications","marketplace_products","marketplace_enquiries","public_enquiries","social_content_drafts","social_publish_attempts"}
+required = {"departments","department_memberships","work_assignments","marketplace_categories","marketplace_seller_applications","marketplace_vendor_applications","marketplace_products","marketplace_enquiries","public_enquiries","social_content_drafts","social_publish_attempts","automation_agents","automation_tasks","automation_approvals","automation_audit_log","automation_workflows"}
 missing = required-tables
 assert not missing, f"Missing tables: {sorted(missing)}"
 assert db.execute("SELECT COUNT(*) FROM marketplace_categories").fetchone()[0] >= 15, "Category seeds missing"
@@ -18,5 +18,10 @@ db.execute("INSERT INTO marketplace_enquiries(id,name,email,message) VALUES('enq
 db.execute("INSERT INTO public_enquiries(id,name,email,message) VALUES('public1','Test','test@example.com','Public enquiry')")
 db.execute("INSERT INTO social_content_drafts(id,channel,caption) VALUES('social1','instagram','Test caption')")
 assert db.execute("SELECT COUNT(*) FROM marketplace_products WHERE status='approved'").fetchone()[0] == 1
+db.execute("INSERT INTO automation_agents(id,name,agent_type,status) VALUES('agent-test','Test Agent','test','draft')")
+db.execute("INSERT INTO automation_tasks(id,agent_id,task_type,payload_json) VALUES('task-test','agent-test','test_task','{}')")
+db.execute("INSERT INTO automation_approvals(id,task_id,action_type,details_json) VALUES('approval-test','task-test','publish','{}')")
+db.execute("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id) VALUES('audit-test','tester','created','task','task-test')")
+db.execute("INSERT INTO automation_workflows(id,name,trigger_type,steps_json) VALUES('workflow-test','Test workflow','manual','[]')")
 assert db.execute("PRAGMA foreign_key_check").fetchall() == []
-print("PASS: migration, seeded categories, CRUD smoke checks, and foreign-key integrity")
+print("PASS: migrations 0002-0004, marketplace CRUD, automation schema, and foreign-key integrity")
