@@ -39,6 +39,54 @@ export default {
     if(request.method==="OPTIONS") return new Response(null,{status:204,headers:cors});
     if(url.pathname==="/api/health") return json({ok:true,app:env.APP_NAME,environment:env.APP_ENV,timestamp:new Date().toISOString()});
     if(url.pathname==="/api") return json({name:env.APP_NAME,status:"public-api-foundation",endpoints:["GET /api/health","GET /api/marketplace/categories","GET /api/marketplace/products","POST /api/marketplace/seller-register","POST /api/marketplace/vendor-register","POST /api/marketplace/enquiry","POST /api/public/enquiry"]});
+    if(url.pathname.startsWith("/api/admin/automation/")) {
+      if(!adminOk(request,env)) return adminJson({error:"Unauthorized. Configure ADMIN_TOKEN and provide a bearer token."},401);
+      try {
+        if(url.pathname==="/api/admin/automation/summary" && request.method==="GET"){
+          const [agents,tasks,approvals,workflows]=await Promise.all([
+            env.DB.prepare("SELECT status,COUNT(*) count FROM automation_agents GROUP BY status").all(),
+            env.DB.prepare("SELECT status,COUNT(*) count FROM automation_tasks GROUP BY status").all(),
+            env.DB.prepare("SELECT status,COUNT(*) count FROM automation_approvals GROUP BY status").all(),
+            env.DB.prepare("SELECT status,COUNT(*) count FROM automation_workflows GROUP BY status").all()
+          ]);
+          return adminJson({agents:agents.results,tasks:tasks.results,approvals:approvals.results,workflows:workflows.results});
+        }
+        if(url.pathname==="/api/admin/automation/agents" && request.method==="POST"){
+          const b=await parseBody(request),name=clean(b.name,100),type=clean(b.agent_type,80),description=clean(b.description,1000);
+          if(!name||!type)return adminJson({error:"name and agent_type are required"},400);
+          const id=uid();await env.DB.prepare("INSERT INTO automation_agents(id,name,agent_type,description,config_json,status) VALUES(?,?,?,?,?,'draft')").bind(id,name,type,description,JSON.stringify(b.config||{})).run();
+          await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","agent_created","agent",id,JSON.stringify({name,type})).run();
+          return adminJson({ok:true,id,status:"draft",note:"Agent saved as draft. Activation is not automatic."},201);
+        }
+        if(url.pathname==="/api/admin/automation/tasks" && request.method==="POST"){
+          const b=await parseBody(request),type=clean(b.task_type,100);
+          if(!type)return adminJson({error:"task_type is required"},400);
+          const id=uid(),payload=JSON.stringify(b.payload||{}),agentId=clean(b.agent_id,80)||null;
+          await env.DB.prepare("INSERT INTO automation_tasks(id,agent_id,task_type,payload_json,status,scheduled_at) VALUES(?,?,?,?, 'queued',?)").bind(id,agentId,type,payload,clean(b.scheduled_at,40)||null).run();
+          await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","task_queued","task",id,JSON.stringify({type,agentId})).run();
+          return adminJson({ok:true,id,status:"queued",note:"Queue record created. Task runner is not yet installed."},201);
+        }
+        if(url.pathname==="/api/admin/automation/workflows" && request.method==="POST"){
+          const b=await parseBody(request),name=clean(b.name,100),trigger=clean(b.trigger_type,20)||"manual";
+          if(!name||!["manual","schedule","event"].includes(trigger))return adminJson({error:"Valid name and trigger_type (manual/schedule/event) required"},400);
+          const id=uid();await env.DB.prepare("INSERT INTO automation_workflows(id,name,description,trigger_type,trigger_config_json,steps_json,status) VALUES(?,?,?,?,?,?,'draft')").bind(id,name,clean(b.description,1000),trigger,JSON.stringify(b.trigger_config||{}),JSON.stringify(Array.isArray(b.steps)?b.steps:[])).run();
+          await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","workflow_created","workflow",id,JSON.stringify({name,trigger})).run();
+          return adminJson({ok:true,id,status:"draft",note:"Workflow saved as draft. Execution is not enabled."},201);
+        }
+        if(url.pathname==="/api/admin/automation/approvals" && request.method==="POST"){
+          const b=await parseBody(request),action=clean(b.action_type,100);
+          if(!action)return adminJson({error:"action_type is required"},400);
+          const id=uid(),taskId=clean(b.task_id,80)||null;
+          await env.DB.prepare("INSERT INTO automation_approvals(id,task_id,action_type,details_json,requested_by,status) VALUES(?,?,?,?,?,'pending')").bind(id,taskId,action,JSON.stringify(b.details||{}),"admin").run();
+          await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","approval_requested","approval",id,JSON.stringify({action,taskId})).run();
+          return adminJson({ok:true,id,status:"pending"},201);
+        }
+        return adminJson({error:"Not found"},404);
+      }catch(e){
+        if(e instanceof SyntaxError)return adminJson({error:"Malformed JSON body"},400);
+        return adminJson({error:"Automation request failed. Check migrations and logs."},503);
+      }
+    }
     try {
       if(url.pathname==="/api/marketplace/categories" && request.method==="GET"){
         const rows=await env.DB.prepare("SELECT id,name,slug,parent_id FROM marketplace_categories WHERE active=1 ORDER BY name").all();
