@@ -2,10 +2,10 @@ import pathlib, sqlite3, json
 root = pathlib.Path(__file__).resolve().parents[1]
 db = sqlite3.connect(":memory:")
 db.execute("PRAGMA foreign_keys=ON")
-for path in [root/"db/schema.sql", root/"db/migrations/0002_enterprise_public_and_marketplace.sql", root/"db/migrations/0003_seed_marketplace_categories.sql", root/"db/migrations/0004_automation_core.sql", root/"db/migrations/0005_projects_quotations.sql"]:
+for path in [root/"db/schema.sql", root/"db/migrations/0002_enterprise_public_and_marketplace.sql", root/"db/migrations/0003_seed_marketplace_categories.sql", root/"db/migrations/0004_automation_core.sql", root/"db/migrations/0005_projects_quotations.sql", root/"db/migrations/0006_procurement_vendors.sql"]:
     db.executescript(path.read_text(encoding="utf-8"))
 tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-required = {"departments","department_memberships","work_assignments","marketplace_categories","marketplace_seller_applications","marketplace_vendor_applications","marketplace_products","marketplace_enquiries","public_enquiries","social_content_drafts","social_publish_attempts","automation_agents","automation_tasks","automation_approvals","automation_audit_log","automation_workflows","projects","quotations","quotation_items"}
+required = {"departments","department_memberships","work_assignments","marketplace_categories","marketplace_seller_applications","marketplace_vendor_applications","marketplace_products","marketplace_enquiries","public_enquiries","social_content_drafts","social_publish_attempts","automation_agents","automation_tasks","automation_approvals","automation_audit_log","automation_workflows","projects","quotations","quotation_items","vendors","purchase_orders","purchase_order_items"}
 missing = required-tables
 assert not missing, f"Missing tables: {sorted(missing)}"
 assert db.execute("SELECT COUNT(*) FROM marketplace_categories").fetchone()[0] >= 15, "Category seeds missing"
@@ -31,3 +31,9 @@ db.execute("INSERT INTO projects(id,organization_id,name,status) VALUES('project
 db.execute("INSERT INTO quotations(id,organization_id,project_id,quotation_number,client_name,subtotal,discount_amount,taxable_amount,gst_rate,gst_amount,total_amount) VALUES('quote-test','test-org','project-test','Q-TEST-001','Test Client',1000,0,1000,18,180,1180)")
 db.execute("INSERT INTO quotation_items(id,quotation_id,description,unit,quantity,rate,amount,gst_rate) VALUES('quote-item-test','quote-test','Test item','Nos',2,500,1000,18)")
 assert db.execute("SELECT total_amount FROM quotations WHERE id='quote-test'").fetchone()[0] == 1180
+
+# Procurement schema integration smoke checks
+db.execute("INSERT INTO vendors(id,organization_id,vendor_name,status) VALUES('vendor-test','test-org','Test Vendor','active')")
+db.execute("INSERT INTO purchase_orders(id,organization_id,vendor_id,po_number,subtotal,gst_rate,gst_amount,total_amount) VALUES('po-test','test-org','vendor-test','PO-TEST-001',1000,18,180,1180)")
+db.execute("INSERT INTO purchase_order_items(id,purchase_order_id,description,unit,quantity,rate,amount,gst_rate) VALUES('po-item-test','po-test','Test material','Nos',2,500,1000,18)")
+assert db.execute("SELECT total_amount FROM purchase_orders WHERE id='po-test'").fetchone()[0] == 1180
