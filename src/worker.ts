@@ -33,7 +33,49 @@ async function saveRegistration(env: Env, table: "marketplace_seller_application
   await env.DB.prepare(sql).bind(id,name,contact,email,phone,kind,gst).run();
   return json({ok:true,application_id:id,status:"pending_review",message:"Application received; activation requires verification."},201);
 }
+type TaskResult = Record<string,unknown>;
+async function executeSafeTask(env: Env, task: {id:string;task_type:string;payload_json:string;agent_id:string|null}): Promise<TaskResult> {
+  const payload=JSON.parse(task.payload_json||"{}") as Record<string,unknown>;
+  if(task.task_type==="health_check") {
+    const db=await env.DB.prepare("SELECT 1 AS ok").first<{ok:number}>();
+    return {type:"health_check",database:db?.ok===1,checked_at:new Date().toISOString()};
+  }
+  if(task.task_type==="crm_followup_scan") {
+    const organizationId=clean(payload.organization_id,80);
+    if(!organizationId) throw new Error("organization_id is required for crm_followup_scan");
+    const now=new Date().toISOString();
+    const rows=await env.DB.prepare("SELECT id,company_name,contact_name,email,phone,stage,next_followup_at FROM leads WHERE organization_id=? AND next_followup_at IS NOT NULL AND next_followup_at<=? AND stage NOT IN ('won','lost') ORDER BY next_followup_at ASC LIMIT 100").bind(organizationId,now).all();
+    return {type:"crm_followup_scan",organization_id:organizationId,due_count:rows.results.length,items:rows.results,generated_at:now,note:"Read-only scan. No email, SMS, WhatsApp, or call was sent."};
+  }
+  throw new Error("Task type is not allow-listed for execution");
+}
+async function runAutomationBatch(env: Env, maxTasks=5): Promise<{processed:number;completed:number;failed:number}> {
+  let processed=0,completed=0,failed=0;
+  for(let i=0;i<maxTasks;i++) {
+    const task=await env.DB.prepare("SELECT id,task_type,payload_json,agent_id,attempts,max_attempts FROM automation_tasks WHERE status='queued' AND (scheduled_at IS NULL OR scheduled_at<=CURRENT_TIMESTAMP) ORDER BY created_at ASC LIMIT 1").first<{id:string;task_type:string;payload_json:string;agent_id:string|null;attempts:number;max_attempts:number}>();
+    if(!task) break;
+    const claim=await env.DB.prepare("UPDATE automation_tasks SET status='running',started_at=CURRENT_TIMESTAMP,attempts=attempts+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='queued'").bind(task.id).run();
+    if(!claim.meta.changes) continue;
+    processed++;
+    try {
+      const output=await executeSafeTask(env,task);
+      await env.DB.prepare("UPDATE automation_tasks SET status='completed',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,last_error=NULL WHERE id=? AND status='running'").bind(task.id).run();
+      await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"system","task_completed","task",task.id,JSON.stringify({task_type:task.task_type,result_type:output.type})).run();
+      completed++;
+    } catch(e) {
+      const message=e instanceof Error?e.message:"Task execution failed";
+      const nextStatus=task.attempts+1>=task.max_attempts?"failed":"queued";
+      await env.DB.prepare("UPDATE automation_tasks SET status=?,last_error=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='running'").bind(nextStatus,message.slice(0,500),task.id).run();
+      await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"system","task_failed","task",task.id,JSON.stringify({task_type:task.task_type,error:message,next_status:nextStatus})).run();
+      failed++;
+    }
+  }
+  return {processed,completed,failed};
+}
 export default {
+  async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    await runAutomationBatch(env,5);
+  },
   async fetch(request: Request, env: Env): Promise<Response> {
     const url=new URL(request.url);
     if(request.method==="OPTIONS") return new Response(null,{status:204,headers:cors});
@@ -165,7 +207,7 @@ export default {
           const id=uid(),payload=JSON.stringify(b.payload||{}),agentId=clean(b.agent_id,80)||null;
           await env.DB.prepare("INSERT INTO automation_tasks(id,agent_id,task_type,payload_json,status,scheduled_at) VALUES(?,?,?,?, 'queued',?)").bind(id,agentId,type,payload,clean(b.scheduled_at,40)||null).run();
           await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","task_queued","task",id,JSON.stringify({type,agentId})).run();
-          return adminJson({ok:true,id,status:"queued",note:"Queue record created. Task runner is not yet installed."},201);
+          return adminJson({ok:true,id,status:"queued",note:"Queued for allow-listed scheduled execution. Unsupported task types will fail safely."},201);
         }
         if(url.pathname==="/api/admin/automation/workflows" && request.method==="POST"){
           const b=await parseBody(request),name=clean(b.name,100),trigger=clean(b.trigger_type,20)||"manual";
