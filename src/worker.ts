@@ -10,7 +10,7 @@ export interface Env {
 
 const headers = { "content-type": "application/json; charset=utf-8", "x-content-type-options": "nosniff", "cache-control": "no-store" };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers });
-const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type, authorization" };
+const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,PATCH,OPTIONS", "access-control-allow-headers": "content-type, authorization" };
 const corsJson = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, ...cors } });
 const adminOk = (request: Request, env: Env) => !!env.ADMIN_TOKEN && request.headers.get("authorization") === `Bearer ${env.ADMIN_TOKEN}`;
 const adminJson = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, ...cors } });
@@ -161,7 +161,7 @@ export default {
           const b=await parseBody(request),id=clean(decodeURIComponent(leadMatch[1]),80);
           const current=await env.DB.prepare("SELECT id,organization_id,company_name,contact_name,email,phone,source,stage,next_followup_at,notes FROM leads WHERE id=?").bind(id).first<Record<string,unknown>>();
           if(!current)return adminJson({error:"Lead not found"},404);
-          const company=clean(b.company_name,200)||String(current.company_name),contact=clean(b.contact_name,120)||String(current.contact_name||""),email=clean(b.email,180).toLowerCase()||String(current.email||""),phone=clean(b.phone,30)||String(current.phone||""),source=clean(b.source,100)||String(current.source||""),notes=clean(b.notes,4000)||String(current.notes||""),stage=clean(b.stage,40)||String(current.stage),follow=clean(b.next_followup_at,40)||String(current.next_followup_at||"");
+          const has=(key:string)=>Object.prototype.hasOwnProperty.call(b,key);const company=has("company_name")?clean(b.company_name,200):String(current.company_name),contact=has("contact_name")?clean(b.contact_name,120):String(current.contact_name||""),email=has("email")?clean(b.email,180).toLowerCase():String(current.email||""),phone=has("phone")?clean(b.phone,30):String(current.phone||""),source=has("source")?clean(b.source,100):String(current.source||""),notes=has("notes")?clean(b.notes,4000):String(current.notes||""),stage=has("stage")?clean(b.stage,40):String(current.stage),follow=has("next_followup_at")?clean(b.next_followup_at,40):String(current.next_followup_at||"");
           if(email&&!validEmail(email))return adminJson({error:"Invalid email address"},400);
           if(!["new","contacted","qualified","proposal","negotiation","won","lost"].includes(stage))return adminJson({error:"Invalid lead stage"},400);
           await env.DB.prepare("UPDATE leads SET company_name=?,contact_name=?,email=?,phone=?,source=?,stage=?,next_followup_at=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(company,contact||null,email||null,phone||null,source||null,stage,follow||null,notes||null,id).run();
