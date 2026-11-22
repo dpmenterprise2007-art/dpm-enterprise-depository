@@ -42,6 +42,30 @@ export default {
     if(url.pathname.startsWith("/api/admin/automation/")) {
       if(!adminOk(request,env)) return adminJson({error:"Unauthorized. Configure ADMIN_TOKEN and provide a bearer token."},401);
       try {
+        if(url.pathname==="/api/admin/automation/agents/control" && request.method==="POST"){
+          const b=await parseBody(request),id=clean(b.agent_id,80),status=clean(b.status,20);
+          if(!id||!["active","paused","disabled","draft"].includes(status))return adminJson({error:"agent_id and valid status required"},400);
+          const res=await env.DB.prepare("UPDATE automation_agents SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(status,id).run();
+          if(!res.meta.changes)return adminJson({error:"Agent not found"},404);
+          await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","agent_status_changed","agent",id,JSON.stringify({status})).run();
+          return adminJson({ok:true,id,status,note:"Status updated. This repository does not yet contain an agent executor."});
+        }
+        if(url.pathname==="/api/admin/automation/workflows/control" && request.method==="POST"){
+          const b=await parseBody(request),id=clean(b.workflow_id,80),status=clean(b.status,20);
+          if(!id||!["active","paused","disabled","draft"].includes(status))return adminJson({error:"workflow_id and valid status required"},400);
+          const res=await env.DB.prepare("UPDATE automation_workflows SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(status,id).run();
+          if(!res.meta.changes)return adminJson({error:"Workflow not found"},404);
+          await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","workflow_status_changed","workflow",id,JSON.stringify({status})).run();
+          return adminJson({ok:true,id,status,note:"Workflow status updated. Scheduling and execution engine are not yet connected."});
+        }
+        if(url.pathname==="/api/admin/automation/tasks/cancel" && request.method==="POST"){
+          const b=await parseBody(request),id=clean(b.task_id,80);
+          if(!id)return adminJson({error:"task_id required"},400);
+          const res=await env.DB.prepare("UPDATE automation_tasks SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('queued','awaiting_approval')").bind(id).run();
+          if(!res.meta.changes)return adminJson({error:"Task not found or not cancellable"},409);
+          await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","task_cancelled","task",id,"{}").run();
+          return adminJson({ok:true,id,status:"cancelled"});
+        }
         if(url.pathname==="/api/admin/automation/summary" && request.method==="GET"){
           const [agents,tasks,approvals,workflows]=await Promise.all([
             env.DB.prepare("SELECT status,COUNT(*) count FROM automation_agents GROUP BY status").all(),
