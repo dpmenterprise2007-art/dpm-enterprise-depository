@@ -6,7 +6,7 @@ workers_dev = true
 [[d1_databases]]
 binding = "DB"
 database_name = "dpm-enterprise-os"
-database_id = "REPLACE_AFTER_CREATE_D1"
+database_id = "9aa7b6fa-8ba7-42d3-b119-320d31f3230a"
 
 [[r2_buckets]]
 binding = "DOCS"
