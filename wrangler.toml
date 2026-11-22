@@ -15,3 +15,6 @@ bucket_name = "dpm-enterprise-documents"
 [vars]
 APP_NAME = "DPM Enterprise OS"
 APP_ENV = "production"
+
+[triggers]
+crons = ["*/5 * * * *"]
