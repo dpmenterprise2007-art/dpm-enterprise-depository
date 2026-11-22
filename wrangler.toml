@@ -9,9 +9,6 @@ database_name = "dpm-enterprise-os"
 database_id = "9aa7b6fa-8ba7-42d3-b119-320d31f3230a"
 migrations_dir = "db/migrations"
 
-[[r2_buckets]]
-binding = "DOCS"
-bucket_name = "dpm-enterprise-documents"
 
 [vars]
 APP_NAME = "DPM Enterprise OS"
