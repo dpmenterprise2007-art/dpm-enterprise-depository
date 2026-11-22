@@ -36,3 +36,11 @@ assert 'Send a project enquiry' in worker, "Public enquiry form missing"
 assert "fetch('/api/public/enquiry'" in worker, "Public enquiry form must call the enquiry endpoint"
 assert 'Autonomous Build & ERP' in worker, "Public status must disclose incomplete autonomous ERP features"
 print("PASS: public homepage, status endpoint, and enquiry form markers exist")
+
+# CRM functionality assertions for search, source filtering, and activity history.
+assert 'search=clean(url.searchParams.get("search"),160)' in worker, "CRM lead search query missing"
+assert 'source=clean(url.searchParams.get("source"),100)' in worker, "CRM source filter missing"
+assert 'activityMatch=url.pathname.match' in worker, "CRM lead activity endpoint missing"
+assert '/activity' in worker, "CRM activity endpoint path missing"
+assert 'company_name LIKE ? OR contact_name LIKE ? OR email LIKE ? OR phone LIKE ?' in worker, "CRM multi-field search missing"
+print("PASS: CRM search, source filter, and lead activity endpoint markers exist")
