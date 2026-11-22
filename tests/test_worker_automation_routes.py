@@ -19,4 +19,4 @@ assert "ADMIN_TOKEN" in worker, "Admin token gate missing"
 assert "organization_id is required" in worker, "CRM leads must be scoped to an organization"
 assert "Invalid lead stage" in worker, "CRM lead stage validation missing"
 assert "lead_created" in worker and "lead_updated" in worker, "CRM audit trail missing"
-print("PASS: CRM and automation routes are present, protected, validated, and audited")
+assert "async scheduled(" in worker, "Scheduled task executor hook missing"\nassert "crm_followup_scan" in worker, "CRM follow-up scan task missing"\nassert "health_check" in worker, "Health check task missing"\nassert "allow-listed" in worker, "Safe execution allow-list messaging missing"\nassert "output_json=?" in worker, "Task output must be persisted"\nprint("PASS: CRM and automation routes are present, protected, validated, and audited")
