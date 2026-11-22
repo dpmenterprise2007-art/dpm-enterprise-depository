@@ -1,7 +1,7 @@
 "use client";
-import {useCallback,useEffect,useMemo,useState} from "react";
+import {useCallback,useEffect,useMemo,useState} from "react";\nimport type {CSSProperties} from "react";
 type Item=Record<string,any>;
-const baseStyle:React.CSSProperties={background:"#0c1424",color:"#e9efff",border:"1px solid #29364c",borderRadius:12,padding:10,width:"100%"};
+const baseStyle:CSSProperties={background:"#0c1424",color:"#e9efff",border:"1px solid #29364c",borderRadius:12,padding:10,width:"100%"};
 export default function AutomationClient(){
  const [api,setApi]=useState("");const [token,setToken]=useState("");const [tab,setTab]=useState("overview");const [summary,setSummary]=useState<Item>({});const [agents,setAgents]=useState<Item[]>([]);const [tasks,setTasks]=useState<Item[]>([]);const [workflows,setWorkflows]=useState<Item[]>([]);const [approvals,setApprovals]=useState<Item[]>([]);const [error,setError]=useState("");const [notice,setNotice]=useState("");const [busy,setBusy]=useState(false);
  const [agentName,setAgentName]=useState("");const [agentType,setAgentType]=useState("business_assistant");const [agentDesc,setAgentDesc]=useState("");
