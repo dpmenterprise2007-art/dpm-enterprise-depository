@@ -57,3 +57,11 @@ assert "agent_id is required for ai_agent_run" in worker, "AI agent task must re
 assert "Agent config_json must be valid JSON" in worker, "Agent config validation missing"
 assert "ai_agent_run" in (root / "src/app/automation/AutomationClient.tsx").read_text(encoding="utf-8"), "AI agent task not exposed in Automation Center UI"
 print("PASS: active AI agents can be invoked from the task queue")
+
+# Workflow runtime is bounded, active-only, and exposed through UI.
+assert "task.task_type===\"workflow_run\"" in worker, "Workflow runtime missing"
+assert "Workflow must contain between 1 and 10 steps" in worker, "Workflow execution step bounds missing"
+assert "Workflow must exist and be active before execution" in worker, "Active workflow gate missing"
+assert "Nested workflow execution is not supported" in worker, "Nested workflow recursion guard missing"
+assert "Run now" in (root / "src/app/automation/AutomationClient.tsx").read_text(encoding="utf-8"), "Workflow Run now control missing"
+print("PASS: bounded workflow runtime and run-now UI are present")
