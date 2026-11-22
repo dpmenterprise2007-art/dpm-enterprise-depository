@@ -5,6 +5,7 @@ export interface Env {
   APP_NAME: string;
   APP_ENV: string;
   ADMIN_TOKEN?: string;
+  AI: Ai;
 }
 
 const headers = { "content-type": "application/json; charset=utf-8", "x-content-type-options": "nosniff", "cache-control": "no-store" };
@@ -289,6 +290,21 @@ export default {
       }catch(e){
         if(e instanceof SyntaxError)return adminJson({error:"Malformed JSON body"},400);
         return adminJson({error:"Automation request failed. Check migrations and logs."},503);
+      }
+    }
+    if(url.pathname==="/api/admin/ai/assist" && request.method==="POST") {
+      if(!adminOk(request,env)) return adminJson({error:"Unauthorized"},401);
+      try {
+        const b=await parseBody(request);
+        const prompt=clean(b.prompt,6000);
+        const context=clean(b.context,12000);
+        const task=clean(b.task,80)||"general";
+        if(!prompt) return adminJson({error:"prompt is required"},400);
+        const system="You are DPM Enterprise AI, an internal business copilot for an Indian interior design and custom furniture company. Give actionable, concise, accurate help. Never invent facts, tender clauses, prices, legal requirements, or company data. Flag assumptions. You cannot send messages, submit bids, make payments, or take external actions. GST references should be treated as user-supplied or general guidance, not legal/tax advice. Respond in Hinglish when the user uses Hinglish.";
+        const result=await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {messages:[{role:"system",content:system},{role:"user",content:"Task: "+task+"\nContext:\n"+context+"\n\nRequest:\n"+prompt}],max_tokens:1200});
+        return adminJson({ok:true,task,response:result,model:"@cf/meta/llama-3.1-8b-instruct",generated_at:new Date().toISOString()});
+      } catch(e) {
+        return adminJson({error:"AI request failed. Check Workers AI availability and account configuration."},503);
       }
     }
     try {
