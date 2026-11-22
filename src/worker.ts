@@ -177,7 +177,7 @@ export default {
         }
         if(url.pathname==="/api/admin/automation/tasks" && request.method==="GET"){
           const status=clean(url.searchParams.get("status"),30),limit=Math.min(Math.max(parseInt(url.searchParams.get("limit")||"50",10)||50,1),100);
-          let q="SELECT id,agent_id,task_type,payload_json,status,attempts,max_attempts,scheduled_at,started_at,completed_at,last_error,created_at FROM automation_tasks";
+          let q="SELECT id,agent_id,task_type,payload_json,status,attempts,max_attempts,scheduled_at,started_at,completed_at,output_json,last_error,created_at FROM automation_tasks";
           const params: string[]=[]; if(status){q+=" WHERE status=?";params.push(status);} q+=" ORDER BY created_at DESC LIMIT ?";params.push(String(limit));
           const rows=await env.DB.prepare(q).bind(...params).all();return adminJson({items:rows.results});
         }
