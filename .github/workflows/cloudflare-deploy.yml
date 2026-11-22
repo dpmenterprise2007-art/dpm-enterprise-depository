@@ -1,6 +1,9 @@
 name: Cloudflare Deploy
 
 on:
+  push:
+    branches:
+      - enterprise-complete-build
   workflow_dispatch:
     inputs:
       confirmation:
@@ -13,7 +16,7 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ inputs.confirmation == 'PUBLISH_FOUNDATION_ONLY' }}
+    if: ${{ github.event_name == 'push' || inputs.confirmation == 'PUBLISH_FOUNDATION_ONLY' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
