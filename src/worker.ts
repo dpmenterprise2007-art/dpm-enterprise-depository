@@ -52,6 +52,15 @@ async function executeSafeTask(env: Env, task: {id:string;task_type:string;paylo
     const rows=await env.DB.prepare("SELECT id,company_name,contact_name,email,phone,stage,next_followup_at FROM leads WHERE organization_id=? AND next_followup_at IS NOT NULL AND next_followup_at<=? AND stage NOT IN ('won','lost') ORDER BY next_followup_at ASC LIMIT 100").bind(organizationId,now).all();
     return {type:"crm_followup_scan",organization_id:organizationId,due_count:rows.results.length,items:rows.results,generated_at:now,note:"Read-only scan. No email, SMS, WhatsApp, or call was sent."};
   }
+  if(task.task_type==="ai_business_analysis") {
+    const prompt=clean(payload.prompt,6000);
+    const context=clean(payload.context,12000);
+    const objective=clean(payload.objective,120);
+    if(!prompt) throw new Error("prompt is required for ai_business_analysis");
+    const system="You are DPM Enterprise AI, an operations and sales analyst for an Indian interior design and custom furniture company. Give actionable analysis in Hinglish when suitable. Do not invent company facts, prices, tender requirements, legal rules, or external research. Clearly separate assumptions from facts. You cannot send messages, make payments, submit bids, or perform external actions.";
+    const result=await env.AI.run("@cf/meta/llama-3.1-8b-instruct",{messages:[{role:"system",content:system},{role:"user",content:"Objective: "+objective+"\\nContext: "+context+"\\nRequest: "+prompt}],max_tokens:1200});
+    return {type:"ai_business_analysis",objective:objective||"general",response:result,model:"@cf/meta/llama-3.1-8b-instruct",generated_at:new Date().toISOString()};
+  }
   throw new Error("Task type is not allow-listed for execution");
 }
 async function runAutomationBatch(env: Env, maxTasks=5): Promise<{processed:number;completed:number;failed:number}> {
@@ -269,7 +278,7 @@ export default {
           const id=uid(),payload=JSON.stringify(b.payload||{}),agentId=clean(b.agent_id,80)||null;
           await env.DB.prepare("INSERT INTO automation_tasks(id,agent_id,task_type,payload_json,status,scheduled_at) VALUES(?,?,?,?, 'queued',?)").bind(id,agentId,type,payload,clean(b.scheduled_at,40)||null).run();
           await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","task_queued","task",id,JSON.stringify({type,agentId})).run();
-          return adminJson({ok:true,id,status:"queued",note:"Queued for allow-listed scheduled execution. Unsupported task types will fail safely."},201);
+          return adminJson({ok:true,id,status:"queued",supported_task_types:["health_check","crm_followup_scan","ai_business_analysis"],note:"Task queued. AI business analysis runs through Workers AI; other task types fail safely unless explicitly allow-listed."},201);
         }
         if(url.pathname==="/api/admin/automation/workflows" && request.method==="POST"){
           const b=await parseBody(request),name=clean(b.name,100),trigger=clean(b.trigger_type,20)||"manual";
