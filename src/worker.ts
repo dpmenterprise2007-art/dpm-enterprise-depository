@@ -4,12 +4,15 @@ export interface Env {
   DOCS: R2Bucket;
   APP_NAME: string;
   APP_ENV: string;
+  ADMIN_TOKEN?: string;
 }
 
 const headers = { "content-type": "application/json; charset=utf-8", "x-content-type-options": "nosniff", "cache-control": "no-store" };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers });
 const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" };
-const corsJson = (data: unknown, status = 200) => json(data,status);
+const corsJson = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, ...cors } });
+const adminOk = (request: Request, env: Env) => !!env.ADMIN_TOKEN && request.headers.get("authorization") === `Bearer ${env.ADMIN_TOKEN}`;
+const adminJson = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, ...cors } });
 const clean = (v: unknown, max = 500) => typeof v === "string" ? v.trim().slice(0,max) : "";
 const validEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const uid = () => crypto.randomUUID();
