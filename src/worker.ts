@@ -322,6 +322,13 @@ export default {
         return adminJson({error:"Automation request failed. Check migrations and logs."},503);
       }
     }
+    if(url.pathname==="/api/admin/ai/modules" && request.method==="GET") {
+      if(!adminOk(request,env)) return adminJson({error:"Unauthorized"},401);
+      try {
+        const rows=await env.DB.prepare("SELECT module_key,name,description,capabilities_json,status FROM ai_module_catalog WHERE status='available' ORDER BY name").all();
+        return adminJson({items:rows.results});
+      } catch(e) { return adminJson({error:"AI module catalog unavailable. Apply database migrations first."},503); }
+    }
     if(url.pathname==="/api/admin/ai/assist" && request.method==="POST") {
       if(!adminOk(request,env)) return adminJson({error:"Unauthorized"},401);
       try {
@@ -330,8 +337,9 @@ export default {
         const context=clean(b.context,12000);
         const task=clean(b.task,80)||"general";
         if(!prompt) return adminJson({error:"prompt is required"},400);
-        const system="You are DPM Enterprise AI, an internal business copilot for an Indian interior design and custom furniture company. Give actionable, concise, accurate help. Never invent facts, tender clauses, prices, legal requirements, or company data. Flag assumptions. You cannot send messages, submit bids, make payments, or take external actions. GST references should be treated as user-supplied or general guidance, not legal/tax advice. Respond in Hinglish when the user uses Hinglish.";
-        const result=await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {messages:[{role:"system",content:system},{role:"user",content:"Task: "+task+"\nContext:\n"+context+"\n\nRequest:\n"+prompt}],max_tokens:1200});
+        const moduleRow=await env.DB.prepare("SELECT name,task_prompt FROM ai_module_catalog WHERE module_key=? AND status='available'").bind(task).first<{name:string;task_prompt:string}>();
+        const system="You are DPM Enterprise AI, an internal business copilot for an Indian interior design and custom furniture company. "+(moduleRow?.task_prompt||"Give actionable, concise, accurate help for the selected task.")+" Never invent facts, tender clauses, prices, legal requirements, contacts, or company data. Flag assumptions and missing evidence. You cannot send messages, submit bids, make payments, publish content, or take external actions. GST references are general guidance and require accountant validation. Respond in Hinglish when the user uses Hinglish.";
+        const result=await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {messages:[{role:"system",content:system},{role:"user",content:"Module: "+(moduleRow?.name||task)+"\nContext:\n"+context+"\n\nRequest:\n"+prompt}],max_tokens:1200});
         return adminJson({ok:true,task,response:result,model:"@cf/meta/llama-3.1-8b-instruct",generated_at:new Date().toISOString()});
       } catch(e) {
         return adminJson({error:"AI request failed. Check Workers AI availability and account configuration."},503);
