@@ -73,6 +73,20 @@ async function executeSafeTask(env: Env, task: {id:string;task_type:string;paylo
     const rows=await env.DB.prepare("SELECT id,client_name,invoice_number,invoice_date,due_date,total_amount,amount_paid,status FROM finance_invoices WHERE organization_id=? AND due_date IS NOT NULL AND due_date<? AND status NOT IN ('paid','cancelled') ORDER BY due_date ASC LIMIT 100").bind(organizationId,now).all();
     return {type:"finance_overdue_scan",organization_id:organizationId,overdue_invoice_count:rows.results.length,total_outstanding:rows.results.reduce((sum,row)=>sum+Math.max(0,Number(row.total_amount||0)-Number(row.amount_paid||0)),0),items:rows.results,generated_at:new Date().toISOString(),note:"Read-only overdue invoice scan; no collection messages were sent."};
   }
+  if(task.task_type==="ai_agent_run") {
+    if(!task.agent_id) throw new Error("agent_id is required for ai_agent_run");
+    const agent=await env.DB.prepare("SELECT name,agent_type,description,config_json,status FROM automation_agents WHERE id=?").bind(task.agent_id).first<{name:string;agent_type:string;description:string;config_json:string;status:string}>();
+    if(!agent||agent.status!=="active") throw new Error("An active agent is required for ai_agent_run");
+    const prompt=clean(payload.prompt,6000);
+    const context=clean(payload.context,12000);
+    if(!prompt) throw new Error("prompt is required for ai_agent_run");
+    let config:Record<string,unknown>={};
+    try { config=JSON.parse(agent.config_json||"{}") as Record<string,unknown>; } catch { throw new Error("Agent config_json must be valid JSON"); }
+    const instructions=clean(config.instructions,4000);
+    const system="You are the DPM Enterprise AI agent named "+agent.name+". Agent type: "+agent.agent_type+". Agent description: "+agent.description+". "+instructions+" Operate only as a business assistant. Do not invent facts, prices, legal rules, external contacts, or research. Clearly flag assumptions and missing evidence. You cannot send communications, publish, submit bids, make payments, or perform external actions. Return actionable results and next steps.";
+    const result=await env.AI.run("@cf/meta/llama-3.1-8b-instruct",{messages:[{role:"system",content:system},{role:"user",content:"Context: "+context+"\nTask: "+prompt}],max_tokens:1200});
+    return {type:"ai_agent_run",agent_id:task.agent_id,agent_name:agent.name,agent_type:agent.agent_type,response:result,model:"@cf/meta/llama-3.1-8b-instruct",generated_at:new Date().toISOString()};
+  }
   if(task.task_type==="ai_business_analysis") {
     const prompt=clean(payload.prompt,6000);
     const context=clean(payload.context,12000);
@@ -307,7 +321,7 @@ export default {
           const id=uid(),payload=JSON.stringify(b.payload||{}),agentId=clean(b.agent_id,80)||null;
           await env.DB.prepare("INSERT INTO automation_tasks(id,agent_id,task_type,payload_json,status,scheduled_at) VALUES(?,?,?,?, 'queued',?)").bind(id,agentId,type,payload,clean(b.scheduled_at,40)||null).run();
           await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","task_queued","task",id,JSON.stringify({type,agentId})).run();
-          return adminJson({ok:true,id,status:"queued",supported_task_types:["health_check","crm_followup_scan","inventory_stock_scan","project_deadline_scan","finance_overdue_scan","ai_business_analysis"],note:"Task queued. Supported scans are read-only; AI analysis runs through Workers AI."},201);
+          return adminJson({ok:true,id,status:"queued",supported_task_types:["health_check","crm_followup_scan","inventory_stock_scan","project_deadline_scan","finance_overdue_scan","ai_business_analysis","ai_agent_run"],note:"Task queued. Supported scans are read-only; AI analysis runs through Workers AI."},201);
         }
         if(url.pathname==="/api/admin/automation/workflows" && request.method==="POST"){
           const b=await parseBody(request),name=clean(b.name,100),trigger=clean(b.trigger_type,20)||"manual";
