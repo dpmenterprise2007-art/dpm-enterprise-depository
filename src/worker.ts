@@ -135,6 +135,63 @@ export default {
         return adminJson({error:"CRM request failed. Check migrations and logs."},503);
       }
     }
+    if(url.pathname.startsWith("/api/admin/projects") || url.pathname.startsWith("/api/admin/quotations")) {
+      if(!adminOk(request,env)) return adminJson({error:"Unauthorized. Configure ADMIN_TOKEN and provide a bearer token."},401);
+      try {
+        if(url.pathname==="/api/admin/projects" && request.method==="GET") {
+          const org=clean(url.searchParams.get("organization_id"),80);
+          if(!org)return adminJson({error:"organization_id is required"},400);
+          const rows=await env.DB.prepare("SELECT * FROM projects WHERE organization_id=? ORDER BY created_at DESC LIMIT 100").bind(org).all();
+          return adminJson({items:rows.results});
+        }
+        if(url.pathname==="/api/admin/projects" && request.method==="POST") {
+          const b=await parseBody(request),org=clean(b.organization_id,80),name=clean(b.name,200);
+          if(!org||!name)return adminJson({error:"organization_id and name are required"},400);
+          const exists=await env.DB.prepare("SELECT id FROM organizations WHERE id=?").bind(org).first();
+          if(!exists)return adminJson({error:"Organization not found"},404);
+          const status=clean(b.status,30)||"planning";
+          if(!["planning","design","quotation","approved","execution","on_hold","completed","cancelled"].includes(status))return adminJson({error:"Invalid project status"},400);
+          const id=uid();
+          await env.DB.prepare("INSERT INTO projects(id,organization_id,name,client_name,project_type,site_address,status,budget_amount,start_date,target_completion_date,notes) VALUES(?,?,?,?,?,?,?,?,?,?,?)").bind(id,org,name,clean(b.client_name,180)||null,clean(b.project_type,100)||null,clean(b.site_address,500)||null,status,typeof b.budget_amount==="number"&&b.budget_amount>=0?b.budget_amount:null,clean(b.start_date,30)||null,clean(b.target_completion_date,30)||null,clean(b.notes,4000)||null).run();
+          await env.DB.prepare("INSERT INTO audit_events(id,organization_id,event_type,entity_type,entity_id,metadata_json) VALUES(?,?,?,?,?,?)").bind(uid(),org,"project_created","project",id,JSON.stringify({name,status})).run();
+          return adminJson({ok:true,id,status:"created"},201);
+        }
+        if(url.pathname==="/api/admin/quotations" && request.method==="GET") {
+          const org=clean(url.searchParams.get("organization_id"),80);
+          if(!org)return adminJson({error:"organization_id is required"},400);
+          const rows=await env.DB.prepare("SELECT * FROM quotations WHERE organization_id=? ORDER BY created_at DESC LIMIT 100").bind(org).all();
+          return adminJson({items:rows.results});
+        }
+        if(url.pathname==="/api/admin/quotations" && request.method==="POST") {
+          const b=await parseBody(request),org=clean(b.organization_id,80),number=clean(b.quotation_number,80),client=clean(b.client_name,180);
+          if(!org||!number||!client)return adminJson({error:"organization_id, quotation_number and client_name are required"},400);
+          const exists=await env.DB.prepare("SELECT id FROM organizations WHERE id=?").bind(org).first();
+          if(!exists)return adminJson({error:"Organization not found"},404);
+          const items=Array.isArray(b.items)?b.items.slice(0,100):[];
+          if(!items.length)return adminJson({error:"At least one quotation item is required"},400);
+          const normalized=[];
+          for(const item of items) {
+            if(!item||typeof item!=="object")return adminJson({error:"Each item must be an object"},400);
+            const desc=clean(item.description,500),unit=clean(item.unit,40)||"Nos",qty=Number(item.quantity),rate=Number(item.rate),gst=Number(item.gst_rate??18);
+            if(!desc||!Number.isFinite(qty)||qty<=0||!Number.isFinite(rate)||rate<0||!Number.isFinite(gst)||gst<0||gst>100)return adminJson({error:"Invalid quotation item description, quantity, rate or GST"},400);
+            normalized.push({description:desc,unit,quantity:qty,rate,amount:qty*rate,hsn_code:clean(item.hsn_code,20)||null,gst_rate:gst});
+          }
+          const subtotal=normalized.reduce((s,x)=>s+x.amount,0),discount=Number(b.discount_amount||0);
+          if(!Number.isFinite(discount)||discount<0||discount>subtotal)return adminJson({error:"discount_amount must be between 0 and subtotal"},400);
+          const taxable=subtotal-discount,gstRate=Number(b.gst_rate??18);
+          if(!Number.isFinite(gstRate)||gstRate<0||gstRate>100)return adminJson({error:"Invalid GST rate"},400);
+          const gstAmount=taxable*gstRate/100,total=taxable+gstAmount,id=uid();
+          await env.DB.prepare("INSERT INTO quotations(id,organization_id,project_id,quotation_number,client_name,client_email,client_phone,status,subtotal,discount_amount,taxable_amount,gst_rate,gst_amount,total_amount,valid_until,notes) VALUES(?,?,?,?,?,?,?,'draft',?,?,?,?,?,?,?, ?,?)").bind(id,org,clean(b.project_id,80)||null,number,client,clean(b.client_email,180)||null,clean(b.client_phone,30)||null,subtotal,discount,taxable,gstRate,gstAmount,total,clean(b.valid_until,30)||null,clean(b.notes,4000)||null).run();
+          for(const item of normalized)await env.DB.prepare("INSERT INTO quotation_items(id,quotation_id,description,unit,quantity,rate,amount,hsn_code,gst_rate) VALUES(?,?,?,?,?,?,?,?,?)").bind(uid(),id,item.description,item.unit,item.quantity,item.rate,item.amount,item.hsn_code,item.gst_rate).run();
+          await env.DB.prepare("INSERT INTO audit_events(id,organization_id,event_type,entity_type,entity_id,metadata_json) VALUES(?,?,?,?,?,?)").bind(uid(),org,"quotation_created","quotation",id,JSON.stringify({quotation_number:number,total_amount:total})).run();
+          return adminJson({ok:true,id,quotation_number:number,subtotal,discount_amount:discount,taxable_amount:taxable,gst_rate:gstRate,gst_amount:gstAmount,total_amount:total,status:"draft"},201);
+        }
+        return adminJson({error:"Not found"},404);
+      } catch(e) {
+        if(e instanceof SyntaxError)return adminJson({error:"Malformed JSON body"},400);
+        return adminJson({error:"Project or quotation request failed. Check migration and logs."},503);
+      }
+    }
     if(url.pathname.startsWith("/api/admin/automation/")) {
       if(!adminOk(request,env)) return adminJson({error:"Unauthorized. Configure ADMIN_TOKEN and provide a bearer token."},401);
       try {
