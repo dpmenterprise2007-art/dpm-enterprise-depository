@@ -51,6 +51,33 @@ export default {
           ]);
           return adminJson({agents:agents.results,tasks:tasks.results,approvals:approvals.results,workflows:workflows.results});
         }
+        if(url.pathname==="/api/admin/automation/agents" && request.method==="GET"){
+          const rows=await env.DB.prepare("SELECT id,name,agent_type,description,config_json,status,created_at,updated_at FROM automation_agents ORDER BY created_at DESC LIMIT 100").all();
+          return adminJson({items:rows.results});
+        }
+        if(url.pathname==="/api/admin/automation/tasks" && request.method==="GET"){
+          const status=clean(url.searchParams.get("status"),30),limit=Math.min(Math.max(parseInt(url.searchParams.get("limit")||"50",10)||50,1),100);
+          let q="SELECT id,agent_id,task_type,payload_json,status,attempts,max_attempts,scheduled_at,started_at,completed_at,last_error,created_at FROM automation_tasks";
+          const params: string[]=[]; if(status){q+=" WHERE status=?";params.push(status);} q+=" ORDER BY created_at DESC LIMIT ?";params.push(String(limit));
+          const rows=await env.DB.prepare(q).bind(...params).all();return adminJson({items:rows.results});
+        }
+        if(url.pathname==="/api/admin/automation/workflows" && request.method==="GET"){
+          const rows=await env.DB.prepare("SELECT id,name,description,trigger_type,trigger_config_json,steps_json,status,created_at,updated_at FROM automation_workflows ORDER BY created_at DESC LIMIT 100").all();return adminJson({items:rows.results});
+        }
+        if(url.pathname==="/api/admin/automation/approvals" && request.method==="GET"){
+          const status=clean(url.searchParams.get("status"),20)||"pending";
+          const rows=await env.DB.prepare("SELECT id,task_id,action_type,details_json,status,requested_by,reviewed_by,review_note,created_at,reviewed_at FROM automation_approvals WHERE status=? ORDER BY created_at DESC LIMIT 100").bind(status).all();return adminJson({items:rows.results});
+        }
+        if(url.pathname==="/api/admin/automation/approvals/review" && request.method==="POST"){
+          const b=await parseBody(request),id=clean(b.approval_id,80),decision=clean(b.decision,20),note=clean(b.note,1000);
+          if(!id||!["approved","rejected"].includes(decision))return adminJson({error:"approval_id and decision (approved/rejected) required"},400);
+          const current=await env.DB.prepare("SELECT status FROM automation_approvals WHERE id=?").bind(id).first<{status:string}>();
+          if(!current)return adminJson({error:"Approval not found"},404);
+          if(current.status!=="pending")return adminJson({error:"Approval already reviewed"},409);
+          await env.DB.prepare("UPDATE automation_approvals SET status=?,reviewed_by='admin',review_note=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'").bind(decision,note,id).run();
+          await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin",`approval_${decision}`,"approval",id,JSON.stringify({note})).run();
+          return adminJson({ok:true,id,status:decision,note:"Decision recorded. Approved actions are not automatically executed."});
+        }
         if(url.pathname==="/api/admin/automation/agents" && request.method==="POST"){
           const b=await parseBody(request),name=clean(b.name,100),type=clean(b.agent_type,80),description=clean(b.description,1000);
           if(!name||!type)return adminJson({error:"name and agent_type are required"},400);
