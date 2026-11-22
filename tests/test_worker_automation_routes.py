@@ -11,6 +11,7 @@ required_routes = [
     "/api/admin/automation/tasks",
     "/api/admin/automation/workflows",
     "/api/admin/automation/approvals",
+    "/api/admin/ai/modules",
 ]
 for route in required_routes:
     assert route in worker, f"Missing automation route: {route}"
@@ -24,4 +25,6 @@ assert "crm_followup_scan" in worker, "CRM follow-up scan task missing"
 assert "health_check" in worker, "Health check task missing"
 assert "allow-listed" in worker, "Safe execution allow-list messaging missing"
 assert "output_json=?" in worker, "Task output must be persisted"
+assert "ai_module_catalog" in worker, "AI module catalog lookup missing"
+assert "task_prompt" in worker, "Specialized AI prompt routing missing"
 print("PASS: CRM and automation routes are present, protected, validated, and audited")
