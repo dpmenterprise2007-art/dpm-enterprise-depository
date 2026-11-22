@@ -17,3 +17,5 @@ This branch contains implementation additions, not a production-certified releas
 
 ## Safety / not yet shipped
 No production domain is switched or live deployment claimed from this repository commit. The AI content generation/publishing agents, complete ERP UI, marketplace checkout/orders/settlement, department permission enforcement, integrations and end-to-end tests remain in active development. Public API handlers are not yet production hardened; do not expose them as a live service until security prerequisites are completed.
+## Cloudflare deployment workflow
+A guarded manual workflow is available at `.github/workflows/cloudflare-deploy.yml`. It requires GitHub Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, runs the web build and migration/route tests, applies remote D1 migrations, ensures the R2 document bucket exists, then deploys the Worker. The workflow is deliberately manual and requires the exact confirmation `PUBLISH_FOUNDATION_ONLY`. This deploys only the API Worker foundation; it does not publish the complete Next.js ERP frontend or constitute a production-ready full ERP release.
