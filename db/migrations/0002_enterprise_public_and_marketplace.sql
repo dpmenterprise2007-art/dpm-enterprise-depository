@@ -42,7 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_work_assignments_assignee_status ON work_assignme
 CREATE INDEX IF NOT EXISTS idx_work_assignments_department_status ON work_assignments(department_id,status);
 
 CREATE TABLE IF NOT EXISTS marketplace_categories (
-  id TEXT PRIMARY PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
   parent_id TEXT REFERENCES marketplace_categories(id),
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS marketplace_categories (
 );
 
 CREATE TABLE IF NOT EXISTS marketplace_seller_applications (
-  id TEXT PRIMARY PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   business_name TEXT NOT NULL,
   contact_name TEXT NOT NULL,
   email TEXT NOT NULL,
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS marketplace_seller_applications (
 CREATE INDEX IF NOT EXISTS idx_seller_app_status ON marketplace_seller_applications(status);
 
 CREATE TABLE IF NOT EXISTS marketplace_vendor_applications (
-  id TEXT PRIMARY PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   business_name TEXT NOT NULL,
   contact_name TEXT NOT NULL,
   email TEXT NOT NULL,
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS marketplace_vendor_applications (
 CREATE INDEX IF NOT EXISTS idx_vendor_app_status ON marketplace_vendor_applications(status);
 
 CREATE TABLE IF NOT EXISTS marketplace_products (
-  id TEXT PRIMARY PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   seller_application_id TEXT REFERENCES marketplace_seller_applications(id),
   title TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
@@ -108,7 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_marketplace_products_status_category ON marketpla
 CREATE INDEX IF NOT EXISTS idx_marketplace_products_title ON marketplace_products(title);
 
 CREATE TABLE IF NOT EXISTS marketplace_enquiries (
-  id TEXT PRIMARY PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   email TEXT,
   phone TEXT,
@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS marketplace_enquiries (
 CREATE INDEX IF NOT EXISTS idx_marketplace_enquiries_status ON marketplace_enquiries(status);
 
 CREATE TABLE IF NOT EXISTS public_enquiries (
-  id TEXT PRIMARY PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   email TEXT,
   phone TEXT,
@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS public_enquiries (
 CREATE INDEX IF NOT EXISTS idx_public_enquiries_status ON public_enquiries(status);
 
 CREATE TABLE IF NOT EXISTS social_content_drafts (
-  id TEXT PRIMARY PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   channel TEXT NOT NULL CHECK(channel IN ('facebook','instagram','linkedin','youtube','pinterest','google_business')),
   format TEXT NOT NULL DEFAULT 'post',
   campaign TEXT,
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS social_content_drafts (
 CREATE INDEX IF NOT EXISTS idx_social_drafts_status_schedule ON social_content_drafts(status,scheduled_at);
 
 CREATE TABLE IF NOT EXISTS social_publish_attempts (
-  id TEXT PRIMARY PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   draft_id TEXT NOT NULL REFERENCES social_content_drafts(id),
   platform TEXT NOT NULL,
   attempt_number INTEGER NOT NULL DEFAULT 1,
