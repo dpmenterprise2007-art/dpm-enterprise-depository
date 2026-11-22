@@ -7,6 +7,7 @@ workers_dev = true
 binding = "DB"
 database_name = "dpm-enterprise-os"
 database_id = "9aa7b6fa-8ba7-42d3-b119-320d31f3230a"
+migrations_dir = "db/migrations"
 
 [[r2_buckets]]
 binding = "DOCS"
