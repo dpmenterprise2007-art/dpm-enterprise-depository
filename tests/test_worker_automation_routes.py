@@ -50,3 +50,10 @@ assert '"access-control-allow-methods": "GET,POST,PATCH,OPTIONS"' in worker, "PA
 assert 'Object.prototype.hasOwnProperty.call(b,key)' in worker, "PATCH must distinguish omitted fields from fields explicitly cleared"
 assert "crm-intelligence" in (root / "src/app/crm/CrmClient.tsx").read_text(encoding="utf-8"), "Lead intelligence UI missing"
 print("PASS: CRM PATCH CORS, field clearing, and lead intelligence assertions")
+
+# AI agent execution regression: active agent configuration is used by task runtime.
+assert "task.task_type===\"ai_agent_run\"" in worker, "AI agent task runtime missing"
+assert "agent_id is required for ai_agent_run" in worker, "AI agent task must require an agent"
+assert "Agent config_json must be valid JSON" in worker, "Agent config validation missing"
+assert "ai_agent_run" in (root / "src/app/automation/AutomationClient.tsx").read_text(encoding="utf-8"), "AI agent task not exposed in Automation Center UI"
+print("PASS: active AI agents can be invoked from the task queue")
