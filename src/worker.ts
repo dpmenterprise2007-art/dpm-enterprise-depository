@@ -41,6 +41,27 @@ async function executeSafeTask(env: Env, task: {id:string;task_type:string;paylo
     if(!agent||agent.status!=="active") throw new Error("Assigned agent must be active before task execution");
   }
   const payload=JSON.parse(task.payload_json||"{}") as Record<string,unknown>;
+  if(task.task_type==="workflow_run") {
+    const workflowId=clean(payload.workflow_id,80);
+    if(!workflowId) throw new Error("workflow_id is required for workflow_run");
+    const workflow=await env.DB.prepare("SELECT name,steps_json,status FROM automation_workflows WHERE id=?").bind(workflowId).first<{name:string;steps_json:string;status:string}>();
+    if(!workflow||workflow.status!=="active") throw new Error("Workflow must exist and be active before execution");
+    let steps:unknown;
+    try { steps=JSON.parse(workflow.steps_json||"[]"); } catch { throw new Error("Workflow steps_json must be valid JSON"); }
+    if(!Array.isArray(steps)||steps.length<1||steps.length>10) throw new Error("Workflow must contain between 1 and 10 steps");
+    const allowed=["health_check","crm_followup_scan","inventory_stock_scan","project_deadline_scan","finance_overdue_scan","ai_business_analysis","ai_agent_run"];
+    const outputs:TaskResult[]=[];
+    for(let i=0;i<steps.length;i++) {
+      const step=steps[i] as Record<string,unknown>;
+      const type=clean(step.task_type,100);
+      if(!allowed.includes(type)) throw new Error("Workflow step "+(i+1)+" has unsupported task_type");
+      if(type==="workflow_run") throw new Error("Nested workflow execution is not supported");
+      const stepAgent=clean(step.agent_id,80)||null;
+      const stepPayload=JSON.stringify(step.payload&&typeof step.payload==="object"?step.payload:{});
+      outputs.push(await executeSafeTask(env,{id:task.id,task_type:type,payload_json:stepPayload,agent_id:stepAgent}));
+    }
+    return {type:"workflow_run",workflow_id:workflowId,workflow_name:workflow.name,step_count:outputs.length,steps:outputs,generated_at:new Date().toISOString()};
+  }
   if(task.task_type==="health_check") {
     const db=await env.DB.prepare("SELECT 1 AS ok").first<{ok:number}>();
     return {type:"health_check",database:db?.ok===1,checked_at:new Date().toISOString()};
@@ -321,7 +342,7 @@ export default {
           const id=uid(),payload=JSON.stringify(b.payload||{}),agentId=clean(b.agent_id,80)||null;
           await env.DB.prepare("INSERT INTO automation_tasks(id,agent_id,task_type,payload_json,status,scheduled_at) VALUES(?,?,?,?, 'queued',?)").bind(id,agentId,type,payload,clean(b.scheduled_at,40)||null).run();
           await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","task_queued","task",id,JSON.stringify({type,agentId})).run();
-          return adminJson({ok:true,id,status:"queued",supported_task_types:["health_check","crm_followup_scan","inventory_stock_scan","project_deadline_scan","finance_overdue_scan","ai_business_analysis","ai_agent_run"],note:"Task queued. Supported scans are read-only; AI analysis runs through Workers AI."},201);
+          return adminJson({ok:true,id,status:"queued",supported_task_types:["health_check","crm_followup_scan","inventory_stock_scan","project_deadline_scan","finance_overdue_scan","ai_business_analysis","ai_agent_run","workflow_run"],note:"Task queued. Supported scans are read-only; AI analysis runs through Workers AI."},201);
         }
         if(url.pathname==="/api/admin/automation/workflows" && request.method==="POST"){
           const b=await parseBody(request),name=clean(b.name,100),trigger=clean(b.trigger_type,20)||"manual";
