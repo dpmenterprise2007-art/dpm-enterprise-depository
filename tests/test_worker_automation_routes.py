@@ -28,3 +28,11 @@ assert "output_json=?" in worker, "Task output must be persisted"
 assert "ai_module_catalog" in worker, "AI module catalog lookup missing"
 assert "task_prompt" in worker, "Specialized AI prompt routing missing"
 print("PASS: CRM and automation routes are present, protected, validated, and audited")
+
+# Public live landing page and status API smoke assertions
+assert 'DPM Enterprise OS' in worker, "Public homepage branding missing"
+assert '/api/public/platform-status' in worker, "Public platform status endpoint missing"
+assert 'Send a project enquiry' in worker, "Public enquiry form missing"
+assert "fetch('/api/public/enquiry'" in worker, "Public enquiry form must call the enquiry endpoint"
+assert 'Autonomous Build & ERP' in worker, "Public status must disclose incomplete autonomous ERP features"
+print("PASS: public homepage, status endpoint, and enquiry form markers exist")
