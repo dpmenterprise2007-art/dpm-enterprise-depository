@@ -1,5 +1,6 @@
 "use client";
-import {useCallback,useEffect,useMemo,useState} from "react";\nimport type {CSSProperties} from "react";
+import {useCallback,useEffect,useMemo,useState} from "react";
+import type {CSSProperties} from "react";
 type Item=Record<string,any>;
 const baseStyle:CSSProperties={background:"#0c1424",color:"#e9efff",border:"1px solid #29364c",borderRadius:12,padding:10,width:"100%"};
 export default function AutomationClient(){
