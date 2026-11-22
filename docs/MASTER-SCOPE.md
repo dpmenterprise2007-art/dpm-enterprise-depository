@@ -166,3 +166,25 @@ Company defaults: India, INR, GST, Asia/Kolkata.
 9. Reporting, integrations, QA, UAT, final production release
 
 This master scope is intentionally broad; implementation is tracked separately from requirements.
+
+# Expanded ecosystem requirements (confirmed by owner)
+
+## 21. Public-domain company website and customer-segment landing pages
+The public domain website is accessible without authentication and is the primary marketing, acquisition, and enquiry experience. It includes company pages, services, portfolio, case studies, projects, galleries, testimonials, reviews, blogs, FAQs, contact, careers, vendor registration, consultation booking, quote requests, SEO/location pages, sitemap, analytics, accessibility and performance controls. Public forms create CRM records with source, consent, deduplication, assignment, and follow-up triggers.
+
+Segment landing experiences and flows: Residential (flat, apartment, 1BHK–5BHK, bungalow, villa, renovation); Commercial (retail, showroom, restaurant, salon, clinic); Corporate (offices, IT workplaces, institutional spaces); Builders & Developers (bulk units, sample flats, common areas, turnkey); Architects & Consultants (collaboration, drawings, BOQ, vendor coordination); Hospitality & Institutions (hotels, hospitals, schools and larger facilities). Each segment has tailored content, forms, calculators/estimators, requirements questionnaire, room/area/project-type inputs, budget, material/finish preferences, timeline/possession, plan/photo/PDF uploads, consultation and quotation requests, and CRM-linked follow-up. Segment landing pages must not imply a fixed quote before required details and review.
+
+## 22. Customer lifecycle and dedicated customer experience
+Customer onboarding, account creation, verification, profile, consent/preferences, project workspace, requirements, quotation, revisions, contract, milestone plan, design/material approvals, project progress, site photos/videos, messages, meetings, documents, invoices, GST breakdown, payment/receipts, support tickets, complaints, change requests, handover, warranty, maintenance, feedback/review and data export. Customers can view only their own authorized records.
+
+## 23. Department-specific workspaces (not one generic dashboard)
+Every internal department has its own workspace, login/role scope, dashboard, task inbox, pending work, priorities, approval queue, calendar, documents, reports, notifications, AI assistant, automations, activity/audit history and escalation controls. Modules/workspaces include Management/Director, Marketing, Sales, CRM, Design, Estimation/BOQ, Procurement/Purchase, Vendor, Project Management, Site Operations, Finance, Accounting, HR, Compliance, Legal, Support/Service Desk and IT/System Administration. Each department must have real end-to-end workflows, status transitions, permissions and handoff rules, not merely a menu or decorative UI.
+
+## 24. Mobile application and installable experience
+Mobile-first responsive web/PWA and installable app experience, with app manifest, icons, installation flow, secure authentication, push notification capability where supported/configured, offline-safe read views and queued actions with conflict handling, camera/photo upload for site/client updates, document viewing, approvals, task updates, client/vendor/employee role-aware navigation, deep links, accessibility, update/maintenance behavior and device/session management. Native app store builds are a separate release deliverable if required; do not claim store publication until actually built, signed, tested and published.
+
+## 25. Calculators, formulas and rules engine
+Configurable and versioned formulas/rules for area and unit conversions, BOQ quantities, wastage, labor/material rates, overhead, contingency, margin, discount, GST/tax calculation, quote totals, payment milestones, project budgets, procurement variance, inventory reorder points, sales scoring, SLA/priority, payroll calculations and dashboard KPIs. Formula editor with permissions, input validation, rounding/unit definitions, effective dates, test cases, preview, audit history and rollback. Formulas must be testable and not silently change historic estimates/invoices.
+
+## 26. Completeness and module ownership
+No department/module is accepted as complete merely because a page or button exists. Each module must have defined user roles, permissions, CRUD/API/database persistence, validation, workflow transitions, notifications, reports, integration/handoff, audit logs, automated tests, manual UAT and failure/empty states. Maintain a requirements traceability matrix with status (not started/in progress/tested/blocked/released), owner, evidence, defects and dependencies. Missing items remain visible in the release backlog; do not declare “nothing pending” unless the matrix and release gate prove it.
