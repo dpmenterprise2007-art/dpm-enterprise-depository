@@ -131,10 +131,10 @@ export default {
           return adminJson({ok:true,id,legal_name:name},201);
         }
         if(url.pathname==="/api/admin/crm/leads" && request.method==="GET") {
-          const org=clean(url.searchParams.get("organization_id"),80),stage=clean(url.searchParams.get("stage"),40),limit=Math.min(Math.max(parseInt(url.searchParams.get("limit")||"50",10)||50,1),100);
+          const org=clean(url.searchParams.get("organization_id"),80),stage=clean(url.searchParams.get("stage"),40),search=clean(url.searchParams.get("search"),160),source=clean(url.searchParams.get("source"),100),limit=Math.min(Math.max(parseInt(url.searchParams.get("limit")||"50",10)||50,1),100);
           if(!org)return adminJson({error:"organization_id is required"},400);
           let q="SELECT id,organization_id,company_name,contact_name,email,phone,source,stage,next_followup_at,notes,created_at,updated_at FROM leads WHERE organization_id=?";
-          const params:(string|number)[]=[org];if(stage){q+=" AND stage=?";params.push(stage);}q+=" ORDER BY created_at DESC LIMIT ?";params.push(limit);
+          const params:(string|number)[]=[org];if(stage){q+=" AND stage=?";params.push(stage);}if(source){q+=" AND source=?";params.push(source);}if(search){q+=" AND (company_name LIKE ? OR contact_name LIKE ? OR email LIKE ? OR phone LIKE ?)";const term="%"+search+"%";params.push(term,term,term,term);}q+=" ORDER BY created_at DESC LIMIT ?";params.push(limit);
           const rows=await env.DB.prepare(q).bind(...params).all();return adminJson({items:rows.results});
         }
         if(url.pathname==="/api/admin/crm/leads" && request.method==="POST") {
@@ -147,6 +147,14 @@ export default {
           const id=uid();await env.DB.prepare("INSERT INTO leads(id,organization_id,company_name,contact_name,email,phone,source,stage,next_followup_at,notes) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(id,org,company,contact||null,email||null,phone||null,source||null,stage,follow,notes||null).run();
           await env.DB.prepare("INSERT INTO audit_events(id,organization_id,event_type,entity_type,entity_id,metadata_json) VALUES(?,?,?,?,?,?)").bind(uid(),org,"lead_created","lead",id,JSON.stringify({company_name:company,stage})).run();
           return adminJson({ok:true,id,status:"created"},201);
+        }
+        const activityMatch=url.pathname.match(/^\/api\/admin\/crm\/leads\/([^/]+)\/activity$/);
+        if(activityMatch && request.method==="GET") {
+          const id=clean(decodeURIComponent(activityMatch[1]),80);
+          const lead=await env.DB.prepare("SELECT organization_id FROM leads WHERE id=?").bind(id).first<{organization_id:string}>();
+          if(!lead)return adminJson({error:"Lead not found"},404);
+          const rows=await env.DB.prepare("SELECT id,event_type,metadata_json,created_at FROM audit_events WHERE organization_id=? AND entity_type='lead' AND entity_id=? ORDER BY created_at DESC LIMIT 100").bind(lead.organization_id,id).all();
+          return adminJson({items:rows.results});
         }
         const leadMatch=url.pathname.match(/^\/api\/admin\/crm\/leads\/([^/]+)$/);
         if(leadMatch && request.method==="PATCH") {
