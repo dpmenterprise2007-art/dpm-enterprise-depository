@@ -1,0 +1,21 @@
+-- Seed broad B2B marketplace categories for initial taxonomy; users can add subcategories later.
+INSERT OR IGNORE INTO marketplace_categories (id,name,slug,parent_id,active) VALUES
+('cat-construction','Construction & Building','construction-building',NULL,1),
+('cat-interiors','Interior Design & Furniture','interior-design-furniture',NULL,1),
+('cat-electrical','Electrical & Lighting','electrical-lighting',NULL,1),
+('cat-hvac','HVAC & Cooling','hvac-cooling',NULL,1),
+('cat-hardware','Hardware & Tools','hardware-tools',NULL,1),
+('cat-office','Office Supplies & Equipment','office-supplies-equipment',NULL,1),
+('cat-industrial','Industrial Products','industrial-products',NULL,1),
+('cat-safety','Safety & Security','safety-security',NULL,1),
+('cat-it','IT & Electronics','it-electronics',NULL,1),
+('cat-services','Business & Professional Services','business-professional-services',NULL,1),
+('cat-transport','Transport & Logistics','transport-logistics',NULL,1),
+('cat-packaging','Packaging & Printing','packaging-printing',NULL,1),
+('cat-textiles','Textiles & Furnishings','textiles-furnishings',NULL,1),
+('cat-hospitality','Hospitality & Restaurant Supplies','hospitality-restaurant',NULL,1),
+('cat-health','Medical & Healthcare Supplies','medical-healthcare',NULL,1),
+('cat-agriculture','Agriculture & Rural Products','agriculture-rural',NULL,1),
+('cat-automotive','Automotive & Parts','automotive-parts',NULL,1),
+('cat-chemicals','Materials & Chemicals','materials-chemicals',NULL,1),
+('cat-other','Other Products & Services','other-products-services',NULL,1);
