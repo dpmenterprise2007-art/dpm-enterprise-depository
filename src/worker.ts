@@ -38,7 +38,57 @@ export default {
     const url=new URL(request.url);
     if(request.method==="OPTIONS") return new Response(null,{status:204,headers:cors});
     if(url.pathname==="/api/health") return json({ok:true,app:env.APP_NAME,environment:env.APP_ENV,timestamp:new Date().toISOString()});
-    if(url.pathname==="/api") return json({name:env.APP_NAME,status:"public-api-foundation",endpoints:["GET /api/health","GET /api/marketplace/categories","GET /api/marketplace/products","POST /api/marketplace/seller-register","POST /api/marketplace/vendor-register","POST /api/marketplace/enquiry","POST /api/public/enquiry"]});
+    if(url.pathname==="/api") return json({name:env.APP_NAME,status:"public-api-foundation",endpoints:["GET /api/health","GET /api/admin/crm/organizations","POST /api/admin/crm/organizations","GET /api/admin/crm/leads","POST /api/admin/crm/leads","PATCH /api/admin/crm/leads/:id","GET /api/marketplace/categories","GET /api/marketplace/products","POST /api/marketplace/seller-register","POST /api/marketplace/vendor-register","POST /api/marketplace/enquiry","POST /api/public/enquiry"]});
+    if(url.pathname.startsWith("/api/admin/crm/")) {
+      if(!adminOk(request,env)) return adminJson({error:"Unauthorized. Configure ADMIN_TOKEN and provide a bearer token."},401);
+      try {
+        if(url.pathname==="/api/admin/crm/organizations" && request.method==="GET") {
+          const rows=await env.DB.prepare("SELECT id,legal_name,gstin,created_at FROM organizations ORDER BY created_at DESC LIMIT 100").all();
+          return adminJson({items:rows.results});
+        }
+        if(url.pathname==="/api/admin/crm/organizations" && request.method==="POST") {
+          const b=await parseBody(request),name=clean(b.legal_name,200),gst=clean(b.gstin,20)||null;
+          if(!name)return adminJson({error:"legal_name is required"},400);
+          const id=clean(b.id,80)||uid();
+          await env.DB.prepare("INSERT INTO organizations(id,legal_name,gstin) VALUES(?,?,?)").bind(id,name,gst).run();
+          return adminJson({ok:true,id,legal_name:name},201);
+        }
+        if(url.pathname==="/api/admin/crm/leads" && request.method==="GET") {
+          const org=clean(url.searchParams.get("organization_id"),80),stage=clean(url.searchParams.get("stage"),40),limit=Math.min(Math.max(parseInt(url.searchParams.get("limit")||"50",10)||50,1),100);
+          if(!org)return adminJson({error:"organization_id is required"},400);
+          let q="SELECT id,organization_id,company_name,contact_name,email,phone,source,stage,next_followup_at,notes,created_at,updated_at FROM leads WHERE organization_id=?";
+          const params:(string|number)[]=[org];if(stage){q+=" AND stage=?";params.push(stage);}q+=" ORDER BY created_at DESC LIMIT ?";params.push(limit);
+          const rows=await env.DB.prepare(q).bind(...params).all();return adminJson({items:rows.results});
+        }
+        if(url.pathname==="/api/admin/crm/leads" && request.method==="POST") {
+          const b=await parseBody(request),org=clean(b.organization_id,80),company=clean(b.company_name,200),contact=clean(b.contact_name,120),email=clean(b.email,180).toLowerCase(),phone=clean(b.phone,30),source=clean(b.source,100),stage=clean(b.stage,40)||"new",notes=clean(b.notes,4000),follow=clean(b.next_followup_at,40)||null;
+          if(!org||!company)return adminJson({error:"organization_id and company_name are required"},400);
+          if(email&&!validEmail(email))return adminJson({error:"Invalid email address"},400);
+          if(!["new","contacted","qualified","proposal","negotiation","won","lost"].includes(stage))return adminJson({error:"Invalid lead stage"},400);
+          const exists=await env.DB.prepare("SELECT id FROM organizations WHERE id=?").bind(org).first();
+          if(!exists)return adminJson({error:"Organization not found"},404);
+          const id=uid();await env.DB.prepare("INSERT INTO leads(id,organization_id,company_name,contact_name,email,phone,source,stage,next_followup_at,notes) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(id,org,company,contact||null,email||null,phone||null,source||null,stage,follow,notes||null).run();
+          await env.DB.prepare("INSERT INTO audit_events(id,organization_id,event_type,entity_type,entity_id,metadata_json) VALUES(?,?,?,?,?,?)").bind(uid(),org,"lead_created","lead",id,JSON.stringify({company_name:company,stage})).run();
+          return adminJson({ok:true,id,status:"created"},201);
+        }
+        const leadMatch=url.pathname.match(/^\\/api\\/admin\\/crm\\/leads\\/([^/]+)$/);
+        if(leadMatch && request.method==="PATCH") {
+          const b=await parseBody(request),id=clean(decodeURIComponent(leadMatch[1]),80);
+          const current=await env.DB.prepare("SELECT id,organization_id,company_name,contact_name,email,phone,source,stage,next_followup_at,notes FROM leads WHERE id=?").bind(id).first<Record<string,unknown>>();
+          if(!current)return adminJson({error:"Lead not found"},404);
+          const company=clean(b.company_name,200)||String(current.company_name),contact=clean(b.contact_name,120)||String(current.contact_name||""),email=clean(b.email,180).toLowerCase()||String(current.email||""),phone=clean(b.phone,30)||String(current.phone||""),source=clean(b.source,100)||String(current.source||""),notes=clean(b.notes,4000)||String(current.notes||""),stage=clean(b.stage,40)||String(current.stage),follow=clean(b.next_followup_at,40)||String(current.next_followup_at||"");
+          if(email&&!validEmail(email))return adminJson({error:"Invalid email address"},400);
+          if(!["new","contacted","qualified","proposal","negotiation","won","lost"].includes(stage))return adminJson({error:"Invalid lead stage"},400);
+          await env.DB.prepare("UPDATE leads SET company_name=?,contact_name=?,email=?,phone=?,source=?,stage=?,next_followup_at=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(company,contact||null,email||null,phone||null,source||null,stage,follow||null,notes||null,id).run();
+          await env.DB.prepare("INSERT INTO audit_events(id,organization_id,event_type,entity_type,entity_id,metadata_json) VALUES(?,?,?,?,?,?)").bind(uid(),String(current.organization_id),"lead_updated","lead",id,JSON.stringify({stage})).run();
+          return adminJson({ok:true,id,status:"updated"});
+        }
+        return adminJson({error:"Not found"},404);
+      }catch(e){
+        if(e instanceof SyntaxError)return adminJson({error:"Malformed JSON body"},400);
+        return adminJson({error:"CRM request failed. Check migrations and logs."},503);
+      }
+    }
     if(url.pathname.startsWith("/api/admin/automation/")) {
       if(!adminOk(request,env)) return adminJson({error:"Unauthorized. Configure ADMIN_TOKEN and provide a bearer token."},401);
       try {
