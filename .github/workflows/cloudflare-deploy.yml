@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type PUBLISH to deploy the current branch to Cloudflare
+        description: Type PUBLISH_FOUNDATION_ONLY to deploy the API foundation (not the full ERP)
         required: true
         type: string
 
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ inputs.confirmation == 'PUBLISH' }}
+    if: ${{ inputs.confirmation == 'PUBLISH_FOUNDATION_ONLY' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
