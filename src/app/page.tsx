@@ -8,7 +8,8 @@ const modules = [
   ['Procurement & Inventory', 'Vendors, RFQs, purchase orders, stock and manufacturing', 'Not implemented', null],
   ['Finance & Compliance', 'Invoices, GST, receivables, payables, ledger and compliance', 'Not implemented', null],
   ['Marketing & Website', 'SEO, enquiries, content quality and publishing workflows', 'Not implemented', null],
-  ['AI Workbench', 'Cloudflare Workers AI assistant for business tasks', 'AI endpoint + UI', '/ai'],\n  ['AI Automation', 'Agent tasks, approvals, logs and pause controls', 'Foundation only', null],
+  ['AI Workbench', 'Cloudflare Workers AI assistant for business tasks', 'AI endpoint + UI', '/ai'],
+  ['AI Automation', 'Agent tasks, approvals, logs and pause controls', 'Foundation only', null],
 ];
 
 export default function Home() {
