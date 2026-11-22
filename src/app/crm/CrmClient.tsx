@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -78,7 +79,7 @@ export default function CrmClient() {
   };
   const countByStage=(s:string)=>leads.filter(l=>l.stage===s).length;
   return <main className="crm-shell">
-    <header className="crm-header"><a className="crm-back" href="/">← DPM Enterprise OS</a><div><span className="crm-eyebrow">CUSTOMER OPERATIONS</span><h1>CRM & Sales</h1><p>Lead records, pipeline stages and follow-up management.</p></div><span className={connected?"crm-badge live":"crm-badge"}>{connected?"API connected":"Not connected"}</span></header>
+    <header className="crm-header"><Link className="crm-back" href="/">← DPM Enterprise OS</Link><div><span className="crm-eyebrow">CUSTOMER OPERATIONS</span><h1>CRM & Sales</h1><p>Lead records, pipeline stages and follow-up management.</p></div><span className={connected?"crm-badge live":"crm-badge"}>{connected?"API connected":"Not connected"}</span></header>
     <section className="crm-connection"><h2>Secure API connection</h2><p>Enter your Cloudflare Worker URL and admin bearer token. The token is kept only in this page's memory and is not saved to browser storage.</p><div className="crm-connect-grid"><label>API base URL<input value={api} onChange={e=>setApi(e.target.value)} placeholder="https://your-worker.workers.dev" autoComplete="url"/></label><label>Admin token<input value={token} onChange={e=>setToken(e.target.value)} placeholder="ADMIN_TOKEN" type="password" autoComplete="off"/></label><button disabled={busy||!api||!token} onClick={load}>{busy?"Connecting…":"Connect & load"}</button></div></section>
     {error&&<div className="crm-alert error">{error}</div>}{message&&<div className="crm-alert">{message}</div>}
     {connected&&<><section className="crm-metrics">{["new","contacted","qualified","proposal","negotiation","won","lost"].map(s=><article key={s}><span>{s.replace("_"," ")}</span><strong>{countByStage(s)}</strong></article>)}</section>
