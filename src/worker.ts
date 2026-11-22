@@ -35,6 +35,10 @@ async function saveRegistration(env: Env, table: "marketplace_seller_application
 }
 type TaskResult = Record<string,unknown>;
 async function executeSafeTask(env: Env, task: {id:string;task_type:string;payload_json:string;agent_id:string|null}): Promise<TaskResult> {
+  if(task.agent_id) {
+    const agent=await env.DB.prepare("SELECT status FROM automation_agents WHERE id=?").bind(task.agent_id).first<{status:string}>();
+    if(!agent||agent.status!=="active") throw new Error("Assigned agent must be active before task execution");
+  }
   const payload=JSON.parse(task.payload_json||"{}") as Record<string,unknown>;
   if(task.task_type==="health_check") {
     const db=await env.DB.prepare("SELECT 1 AS ok").first<{ok:number}>();
@@ -59,7 +63,7 @@ async function runAutomationBatch(env: Env, maxTasks=5): Promise<{processed:numb
     processed++;
     try {
       const output=await executeSafeTask(env,task);
-      await env.DB.prepare("UPDATE automation_tasks SET status='completed',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,last_error=NULL WHERE id=? AND status='running'").bind(task.id).run();
+      await env.DB.prepare("UPDATE automation_tasks SET status='completed',output_json=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,last_error=NULL WHERE id=? AND status='running'").bind(JSON.stringify(output),task.id).run();
       await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"system","task_completed","task",task.id,JSON.stringify({task_type:task.task_type,result_type:output.type})).run();
       completed++;
     } catch(e) {
