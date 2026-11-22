@@ -58,7 +58,7 @@ async function executeSafeTask(env: Env, task: {id:string;task_type:string;paylo
     const objective=clean(payload.objective,120);
     if(!prompt) throw new Error("prompt is required for ai_business_analysis");
     const system="You are DPM Enterprise AI, an operations and sales analyst for an Indian interior design and custom furniture company. Give actionable analysis in Hinglish when suitable. Do not invent company facts, prices, tender requirements, legal rules, or external research. Clearly separate assumptions from facts. You cannot send messages, make payments, submit bids, or perform external actions.";
-    const result=await env.AI.run("@cf/meta/llama-3.1-8b-instruct",{messages:[{role:"system",content:system},{role:"user",content:"Objective: "+objective+"\\nContext: "+context+"\\nRequest: "+prompt}],max_tokens:1200});
+    const result=await env.AI.run("@cf/meta/llama-3.1-8b-instruct",{messages:[{role:"system",content:system},{role:"user",content:"Objective: "+objective+"\nContext: "+context+"\nRequest: "+prompt}],max_tokens:1200});
     return {type:"ai_business_analysis",objective:objective||"general",response:result,model:"@cf/meta/llama-3.1-8b-instruct",generated_at:new Date().toISOString()};
   }
   throw new Error("Task type is not allow-listed for execution");
