@@ -71,7 +71,7 @@ export default {
           await env.DB.prepare("INSERT INTO audit_events(id,organization_id,event_type,entity_type,entity_id,metadata_json) VALUES(?,?,?,?,?,?)").bind(uid(),org,"lead_created","lead",id,JSON.stringify({company_name:company,stage})).run();
           return adminJson({ok:true,id,status:"created"},201);
         }
-        const leadMatch=url.pathname.match(/^\\/api\\/admin\\/crm\\/leads\\/([^/]+)$/);
+        const leadMatch=url.pathname.match(/^\/api\/admin\/crm\/leads\/([^/]+)$/);
         if(leadMatch && request.method==="PATCH") {
           const b=await parseBody(request),id=clean(decodeURIComponent(leadMatch[1]),80);
           const current=await env.DB.prepare("SELECT id,organization_id,company_name,contact_name,email,phone,source,stage,next_followup_at,notes FROM leads WHERE id=?").bind(id).first<Record<string,unknown>>();
