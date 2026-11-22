@@ -1,0 +1,13 @@
+name: Cloudflare foundation checks
+on:
+  push:
+    branches: [main, enterprise-complete-build]
+  pull_request:
+    branches: [main]
+jobs:
+  migration-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SQL migrations and basic inserts
+        run: python3 tests/test_migrations.py
