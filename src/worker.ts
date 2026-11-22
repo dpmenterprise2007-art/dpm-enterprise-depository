@@ -52,6 +52,27 @@ async function executeSafeTask(env: Env, task: {id:string;task_type:string;paylo
     const rows=await env.DB.prepare("SELECT id,company_name,contact_name,email,phone,stage,next_followup_at FROM leads WHERE organization_id=? AND next_followup_at IS NOT NULL AND next_followup_at<=? AND stage NOT IN ('won','lost') ORDER BY next_followup_at ASC LIMIT 100").bind(organizationId,now).all();
     return {type:"crm_followup_scan",organization_id:organizationId,due_count:rows.results.length,items:rows.results,generated_at:now,note:"Read-only scan. No email, SMS, WhatsApp, or call was sent."};
   }
+
+  if(task.task_type==="inventory_stock_scan") {
+    const organizationId=clean(payload.organization_id,80);
+    if(!organizationId) throw new Error("organization_id is required for inventory_stock_scan");
+    const rows=await env.DB.prepare("SELECT id,sku,item_name,category,unit,stock_qty,reorder_level,unit_cost,warehouse FROM inventory_items WHERE organization_id=? AND status='active' AND stock_qty<=reorder_level ORDER BY (reorder_level-stock_qty) DESC LIMIT 200").bind(organizationId).all();
+    return {type:"inventory_stock_scan",organization_id:organizationId,low_stock_count:rows.results.length,items:rows.results,generated_at:new Date().toISOString(),note:"Read-only stock threshold scan; no purchase orders were created."};
+  }
+  if(task.task_type==="project_deadline_scan") {
+    const organizationId=clean(payload.organization_id,80);
+    if(!organizationId) throw new Error("organization_id is required for project_deadline_scan");
+    const now=new Date().toISOString().slice(0,10);
+    const rows=await env.DB.prepare("SELECT id,name,client_name,status,target_completion_date,budget_amount FROM projects WHERE organization_id=? AND target_completion_date IS NOT NULL AND target_completion_date<=? AND status NOT IN ('completed','cancelled') ORDER BY target_completion_date ASC LIMIT 100").bind(organizationId,now).all();
+    return {type:"project_deadline_scan",organization_id:organizationId,overdue_or_due_count:rows.results.length,items:rows.results,generated_at:new Date().toISOString(),note:"Read-only deadline scan; no project status was changed."};
+  }
+  if(task.task_type==="finance_overdue_scan") {
+    const organizationId=clean(payload.organization_id,80);
+    if(!organizationId) throw new Error("organization_id is required for finance_overdue_scan");
+    const now=new Date().toISOString().slice(0,10);
+    const rows=await env.DB.prepare("SELECT id,client_name,invoice_number,invoice_date,due_date,total_amount,amount_paid,status FROM finance_invoices WHERE organization_id=? AND due_date IS NOT NULL AND due_date<? AND status NOT IN ('paid','cancelled') ORDER BY due_date ASC LIMIT 100").bind(organizationId,now).all();
+    return {type:"finance_overdue_scan",organization_id:organizationId,overdue_invoice_count:rows.results.length,total_outstanding:rows.results.reduce((sum,row)=>sum+Math.max(0,Number(row.total_amount||0)-Number(row.amount_paid||0)),0),items:rows.results,generated_at:new Date().toISOString(),note:"Read-only overdue invoice scan; no collection messages were sent."};
+  }
   if(task.task_type==="ai_business_analysis") {
     const prompt=clean(payload.prompt,6000);
     const context=clean(payload.context,12000);
@@ -278,7 +299,7 @@ export default {
           const id=uid(),payload=JSON.stringify(b.payload||{}),agentId=clean(b.agent_id,80)||null;
           await env.DB.prepare("INSERT INTO automation_tasks(id,agent_id,task_type,payload_json,status,scheduled_at) VALUES(?,?,?,?, 'queued',?)").bind(id,agentId,type,payload,clean(b.scheduled_at,40)||null).run();
           await env.DB.prepare("INSERT INTO automation_audit_log(id,actor,action,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?)").bind(uid(),"admin","task_queued","task",id,JSON.stringify({type,agentId})).run();
-          return adminJson({ok:true,id,status:"queued",supported_task_types:["health_check","crm_followup_scan","ai_business_analysis"],note:"Task queued. AI business analysis runs through Workers AI; other task types fail safely unless explicitly allow-listed."},201);
+          return adminJson({ok:true,id,status:"queued",supported_task_types:["health_check","crm_followup_scan","inventory_stock_scan","project_deadline_scan","finance_overdue_scan","ai_business_analysis"],note:"Task queued. Supported scans are read-only; AI analysis runs through Workers AI."},201);
         }
         if(url.pathname==="/api/admin/automation/workflows" && request.method==="POST"){
           const b=await parseBody(request),name=clean(b.name,100),trigger=clean(b.trigger_type,20)||"manual";
