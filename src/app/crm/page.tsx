@@ -1,4 +1,4 @@
-import CrmClient from "./CrmClient";
+import CrmClient from "./CrmClient";\nimport "./crm.css";
 
 export const metadata = { title: "CRM | DPM Enterprise OS", description: "CRM leads and customer pipeline" };
 
