@@ -1,0 +1,17 @@
+name = "dpm-enterprise-os"
+main = "src/worker.ts"
+compatibility_date = "2026-11-22"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dpm-enterprise-os"
+database_id = "REPLACE_AFTER_CREATE_D1"
+
+[[r2_buckets]]
+binding = "DOCS"
+bucket_name = "dpm-enterprise-documents"
+
+[vars]
+APP_NAME = "DPM Enterprise OS"
+APP_ENV = "production"
